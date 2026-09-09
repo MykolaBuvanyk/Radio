@@ -23,6 +23,7 @@ import {
 } from '../../player/infrastructure/trackPlayerAdapter';
 import {createStableId} from '../../../shared/utils/stableId';
 import {resolveDownloadedQueueSources} from '../../downloads/services/downloadManager';
+import {applyPreferredEpisodePlaybackSpeed} from '../../player/services/playbackSpeedService';
 
 const MAX_PLAYBACK_QUEUE_ITEMS = 500;
 
@@ -135,6 +136,7 @@ async function playPersistedQueue(mediaId: string) {
   const resolvedQueue = await resolveDownloadedQueueSources(queue, mediaId);
 
   activatePlaybackQueue(resolvedQueue, mediaId, positions);
+  applyPreferredEpisodePlaybackSpeed();
   startPlayback();
 }
 

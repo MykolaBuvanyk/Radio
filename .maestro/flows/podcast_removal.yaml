@@ -1,0 +1,32 @@
+appId: com.radioapp
+name: Remove a podcast subscription
+tags:
+  - network
+env:
+  PODCAST_FEED_URL: "https://feeds.npr.org/510289/podcast.xml"
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "screen-radio"
+    timeout: 20000
+- tapOn:
+    id: "tab-podcasts"
+- tapOn:
+    id: "podcast-feed-input"
+- inputText: ${PODCAST_FEED_URL}
+- hideKeyboard
+- tapOn:
+    id: "podcast-add-button"
+- extendedWaitUntil:
+    visible:
+      id: "podcast-subscription-.*"
+    timeout: 30000
+- tapOn:
+    id: "podcast-remove-.*"
+    index: 0
+- assertVisible: "Remove podcast?"
+- tapOn: "^Remove$"
+- assertNotVisible:
+    id: "podcast-subscription-.*"

@@ -5,6 +5,8 @@ import {usePlayerSnapshot} from '../infrastructure/usePlayerSnapshot';
 import {togglePlayback} from '../services/playerService';
 import {usePlayerStore} from '../store/playerStore';
 import {miniPlayerStyles} from './MiniPlayer.styles';
+import {PlaybackSpeedControl} from './PlaybackSpeedControl';
+import {SleepTimerControl} from './SleepTimerControl';
 
 function getStatusLabel(
   isPlaying: boolean,
@@ -43,34 +45,41 @@ export function MiniPlayer() {
   };
 
   return (
-    <View className={miniPlayerStyles.container}>
-      <View className={miniPlayerStyles.metadata}>
-        <Text className={miniPlayerStyles.status}>
-          {getStatusLabel(
-            player.isPlaying,
-            player.mediaType,
-            player.phase,
-          )}
-        </Text>
-        <Text className={miniPlayerStyles.title} numberOfLines={1}>
-          {player.title ?? 'Unknown audio'}
-        </Text>
-        {player.subtitle ? (
-          <Text className={miniPlayerStyles.subtitle} numberOfLines={1}>
-            {player.subtitle}
+    <View className={miniPlayerStyles.container} testID="mini-player">
+      <View className={miniPlayerStyles.mainRow}>
+        <View className={miniPlayerStyles.metadata}>
+          <Text className={miniPlayerStyles.status}>
+            {getStatusLabel(
+              player.isPlaying,
+              player.mediaType,
+              player.phase,
+            )}
           </Text>
-        ) : null}
-      </View>
+          <Text className={miniPlayerStyles.title} numberOfLines={1}>
+            {player.title ?? 'Unknown audio'}
+          </Text>
+          {player.subtitle ? (
+            <Text className={miniPlayerStyles.subtitle} numberOfLines={1}>
+              {player.subtitle}
+            </Text>
+          ) : null}
+        </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={player.isPlaying ? 'Pause playback' : 'Play audio'}
-        className={miniPlayerStyles.button}
-        onPress={handlePlaybackToggle}>
-        <Text className={miniPlayerStyles.buttonText}>
-          {player.isPlaying ? 'Pause' : 'Play'}
-        </Text>
-      </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={player.isPlaying ? 'Pause playback' : 'Play audio'}
+          className={miniPlayerStyles.button}
+          onPress={handlePlaybackToggle}
+          testID="mini-player-toggle">
+          <Text className={miniPlayerStyles.buttonText}>
+            {player.isPlaying ? 'Pause' : 'Play'}
+          </Text>
+        </Pressable>
+      </View>
+      <View className={miniPlayerStyles.controlsRow}>
+        <SleepTimerControl />
+        {player.mediaType === 'episode' ? <PlaybackSpeedControl /> : null}
+      </View>
     </View>
   );
 }

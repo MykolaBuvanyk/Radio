@@ -4,15 +4,34 @@ import type {
 } from '../domain/playbackEvents';
 import {getEpisodePlaybackPosition} from '../infrastructure/playbackPersistenceRepository';
 import {
+  getActiveMediaId,
+  getActiveMediaSummary,
+  getActiveMediaType,
+  getPlaybackPhase,
+  isPlaybackActive,
+  recoverLivePlayback,
   registerTrackPlayerSession,
   seekPlayback,
 } from '../infrastructure/trackPlayerAdapter';
+import {
+  registerRadioRetryCallbacks,
+  reportRadioPlaybackError,
+  reportRadioPlaybackState,
+  setRadioRetryEnabled,
+  stopRadioRetrySession,
+} from '../infrastructure/radioRetryAdapter';
 import {
   flushPendingPlaybackPositions,
   queueEpisodePlaybackPosition,
 } from './playbackPositionWriter';
 import {usePlayerStore} from '../store/playerStore';
 import {touchEpisodeDownload} from '../../downloads/infrastructure/downloadRepository';
+import {
+  checkpointListeningHistory,
+  recordListeningPaused,
+  recordListeningStarted,
+  recordListeningTransition,
+} from './listeningHistoryService';
 
 const latestEpisodeProgress = new Map<
   string,
@@ -54,6 +73,8 @@ function isCompleted(checkpoint: PlaybackProgressCheckpoint) {
 async function persistEpisodeProgress(
   checkpoint: PlaybackProgressCheckpoint,
 ) {
+  checkpointListeningHistory(checkpoint.mediaId, isCompleted(checkpoint));
+
   if (checkpoint.mediaType !== 'episode') {
     return;
   }
@@ -91,13 +112,76 @@ async function restoreEpisodePosition(episodeId: string, generation: number) {
 }
 
 export function registerApplicationPlaybackSession() {
+  registerRadioRetryCallbacks({
+    onNetworkChanged: event => {
+      if (
+        event.networkType === 'none' &&
+        getActiveMediaType() === 'radio' &&
+        isPlaybackActive()
+      ) {
+        usePlayerStore
+          .getState()
+          .reportError('No internet connection. Waiting to reconnect…');
+      }
+    },
+    onRetryExhausted: event => {
+      if (getActiveMediaId() === event.stationId) {
+        usePlayerStore
+          .getState()
+          .reportError('The station could not be reconnected. Tap play to retry.');
+      }
+    },
+    onRetryRequested: request => {
+      if (
+        getActiveMediaId() !== request.stationId ||
+        getActiveMediaType() !== 'radio'
+      ) {
+        return;
+      }
+
+      usePlayerStore
+        .getState()
+        .reportError(
+          `Reconnecting… attempt ${request.attempt} of ${request.maxAttempts}.`,
+        );
+      recoverLivePlayback(
+        request.reason === 'buffering-timeout' ||
+          request.reason === 'network-restored',
+      );
+    },
+  });
+
   registerTrackPlayerSession({
     onError: code => {
       usePlayerStore.getState().reportError(getPlaybackErrorMessage(code));
+
+      const activeMediaId = getActiveMediaId();
+
+      if (
+        activeMediaId &&
+        getActiveMediaType() === 'radio' &&
+        (code === 'network' || code === 'unknown')
+      ) {
+        reportRadioPlaybackError(activeMediaId, code);
+      }
     },
     onIsPlayingChanged: isPlaying => {
       if (isPlaying) {
         usePlayerStore.getState().clearError();
+        recordListeningStarted(getActiveMediaSummary());
+      } else {
+        recordListeningPaused();
+      }
+
+      const activeMediaId = getActiveMediaId();
+
+      if (activeMediaId && getActiveMediaType() === 'radio') {
+        if (isPlaying) {
+          setRadioRetryEnabled(activeMediaId, true);
+          reportRadioPlaybackState(activeMediaId, 'playing');
+        } else if (getPlaybackPhase() === 'ready') {
+          setRadioRetryEnabled(activeMediaId, false);
+        }
       }
     },
     onProgress: persistEpisodeProgress,
@@ -107,10 +191,23 @@ export function registerApplicationPlaybackSession() {
 
       activeEpisodeId =
         transition.mediaType === 'episode' ? transition.mediaId : null;
+      recordListeningTransition(getActiveMediaSummary(), isPlaybackActive());
 
       if (activeEpisodeId) {
+        stopRadioRetrySession();
         await touchEpisodeDownload(activeEpisodeId);
         await restoreEpisodePosition(activeEpisodeId, generation);
+      }
+    },
+    onPlaybackStateChanged: phase => {
+      const activeMediaId = getActiveMediaId();
+
+      if (!activeMediaId || getActiveMediaType() !== 'radio') {
+        return;
+      }
+
+      if (phase === 'buffering' || phase === 'ready') {
+        reportRadioPlaybackState(activeMediaId, phase);
       }
     },
   });

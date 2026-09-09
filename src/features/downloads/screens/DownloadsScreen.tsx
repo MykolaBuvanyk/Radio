@@ -127,6 +127,7 @@ export function DownloadsScreen() {
       ListHeaderComponent={header}
       renderItem={renderDownload}
       showsVerticalScrollIndicator={false}
+      testID="screen-downloads"
     />
   );
 }

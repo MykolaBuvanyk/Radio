@@ -10,11 +10,16 @@ import {
   deletePodcastSubscription,
   getPodcastSubscriptionByFeedUrl,
   getPodcastSubscriptionById,
+  listPodcastEpisodeIds,
   savePodcastFeedSnapshot,
   updatePodcastFeedCacheMetadata,
 } from '../infrastructure/podcastRepository';
 import {createStableId} from '../../../shared/utils/stableId';
 import {deleteFileIfPresent} from '../../downloads/infrastructure/downloadFileAdapter';
+import {removeDownload} from '../../downloads/services/downloadManager';
+import {getActiveMediaId} from '../../player/infrastructure/trackPlayerAdapter';
+import {listPlaybackQueue} from '../../player/infrastructure/playbackPersistenceRepository';
+import {removeItemFromPlaybackQueue} from '../../queue/services/playbackQueueService';
 
 export const PODCAST_EPISODE_PAGE_SIZE = 30;
 const MAX_EPISODES_PER_SYNC = 200;
@@ -161,11 +166,36 @@ async function removeCachedFiles(fileUris: readonly string[]) {
 }
 
 export async function removePodcastSubscription(podcastId: string) {
+  const episodeIds = await listPodcastEpisodeIds(podcastId);
+
+  await prepareEpisodesForDeletion(episodeIds);
   const cachedFileUris = await deletePodcastSubscription(podcastId);
   await removeCachedFiles(cachedFileUris);
 }
 
 export async function removePodcastEpisode(episodeId: string) {
+  await prepareEpisodesForDeletion([episodeId]);
   const cachedFileUris = await deletePodcastEpisode(episodeId);
   await removeCachedFiles(cachedFileUris);
+}
+
+async function prepareEpisodesForDeletion(episodeIds: readonly string[]) {
+  const episodeIdSet = new Set(episodeIds);
+  const activeMediaId = getActiveMediaId();
+
+  if (activeMediaId && episodeIdSet.has(activeMediaId)) {
+    throw new Error('Switch to another item before deleting this episode.');
+  }
+
+  const queue = await listPlaybackQueue();
+
+  for (const item of queue) {
+    if (item.mediaType === 'episode' && episodeIdSet.has(item.mediaId)) {
+      await removeItemFromPlaybackQueue(item.id);
+    }
+  }
+
+  for (const episodeId of episodeIds) {
+    await removeDownload(episodeId);
+  }
 }

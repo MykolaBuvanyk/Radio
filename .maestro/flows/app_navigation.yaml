@@ -1,0 +1,41 @@
+appId: com.radioapp
+name: App navigation and local validation
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "screen-radio"
+    timeout: 20000
+- assertVisible: "Radio"
+- assertVisible:
+    id: "radio-search-input"
+- tapOn:
+    id: "tab-podcasts"
+- assertVisible:
+    id: "screen-podcasts"
+- tapOn:
+    id: "podcast-feed-input"
+- inputText: "not-a-valid-url"
+- hideKeyboard
+- tapOn:
+    id: "podcast-add-button"
+- assertVisible: "Enter a valid podcast feed URL."
+- tapOn:
+    id: "tab-queue"
+- assertVisible:
+    id: "screen-queue"
+- assertVisible: "Your queue is empty"
+- tapOn:
+    id: "tab-downloads"
+- assertVisible:
+    id: "screen-downloads"
+- assertVisible: "No downloads yet"
+- tapOn:
+    id: "tab-library"
+- assertVisible:
+    id: "screen-library"
+- assertVisible: "Favorite stations"
+- assertVisible: "Recent listening"

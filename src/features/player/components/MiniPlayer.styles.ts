@@ -1,6 +1,8 @@
 export const miniPlayerStyles = {
   container:
-    'absolute bottom-20 left-4 right-4 flex-row items-center rounded-2xl border border-app-border bg-app-elevated px-4 py-3',
+    'absolute bottom-20 left-4 right-4 rounded-2xl border border-app-border bg-app-elevated px-4 py-3',
+  mainRow: 'flex-row items-center',
+  controlsRow: 'flex-row items-center gap-2',
   metadata: 'mr-4 flex-1',
   status: 'text-xs font-semibold uppercase tracking-wider text-app-primary',
   title: 'mt-1 text-base font-semibold text-app-text',

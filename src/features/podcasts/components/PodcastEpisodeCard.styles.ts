@@ -16,4 +16,7 @@ export const podcastEpisodeCardStyles = {
   downloadButton:
     'w-full items-center rounded-full border border-app-primary px-4 py-3 active:opacity-80 disabled:opacity-50',
   downloadButtonText: 'text-sm font-bold text-app-primary',
+  deleteButton:
+    'w-full items-center rounded-full border border-red-900 px-4 py-3 active:opacity-80 disabled:opacity-50',
+  deleteButtonText: 'text-sm font-bold text-red-400',
 } as const;

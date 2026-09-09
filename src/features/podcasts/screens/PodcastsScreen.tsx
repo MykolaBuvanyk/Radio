@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {useNavigation} from '@react-navigation/native';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Text,
@@ -43,11 +44,30 @@ export function PodcastsScreen() {
     navigation.navigate('PodcastDetails', {podcastId: subscription.id});
   };
 
+  const handleRemoveSubscription = (subscription: PodcastSubscription) => {
+    Alert.alert(
+      'Remove podcast?',
+      `This deletes ${subscription.title}, its episodes, queue items, and downloaded files from this device.`,
+      [
+        {style: 'cancel', text: 'Cancel'},
+        {
+          style: 'destructive',
+          text: 'Remove',
+          onPress: () => {
+            catalog.removeSubscription(subscription.id).catch(() => undefined);
+          },
+        },
+      ],
+    );
+  };
+
   const renderSubscription = ({
     item,
   }: ListRenderItemInfo<PodcastSubscription>) => (
     <PodcastSubscriptionCard
+      isRemoving={catalog.pendingRemovalId === item.id}
       onPress={handleSubscriptionPress}
+      onRemove={handleRemoveSubscription}
       subscription={item}
     />
   );
@@ -70,13 +90,15 @@ export function PodcastsScreen() {
         placeholder="https://example.com/podcast.xml"
         placeholderTextColor="#64748b"
         returnKeyType="go"
+        testID="podcast-feed-input"
         value={feedUrl}
       />
       <Pressable
         accessibilityRole="button"
         className={podcastsScreenStyles.submitButton}
         disabled={catalog.isSubmitting || feedUrl.trim().length === 0}
-        onPress={handleSubmit}>
+        onPress={handleSubmit}
+        testID="podcast-add-button">
         <Text className={podcastsScreenStyles.submitButtonText}>
           {catalog.isSubmitting ? 'Adding podcast…' : 'Add podcast'}
         </Text>
@@ -121,6 +143,7 @@ export function PodcastsScreen() {
       ListHeaderComponent={header}
       renderItem={renderSubscription}
       showsVerticalScrollIndicator={false}
+      testID="screen-podcasts"
     />
   );
 }

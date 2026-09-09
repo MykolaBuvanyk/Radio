@@ -11,6 +11,7 @@ import {
 import {usePlayerSnapshot} from '../../player/infrastructure/usePlayerSnapshot';
 import {togglePlayback} from '../../player/services/playerService';
 import {usePlayerStore} from '../../player/store/playerStore';
+import {useRadioFavorites} from '../../library/hooks/useRadioFavorites';
 import {RadioFilterChips} from '../components/RadioFilterChips';
 import {RadioStationCard} from '../components/RadioStationCard';
 import {
@@ -31,6 +32,7 @@ function getStationKey(station: RadioStation) {
 
 export function RadioScreen() {
   const catalog = useStationCatalog();
+  const favorites = useRadioFavorites();
   const player = usePlayerSnapshot();
   const setupStatus = usePlayerStore(state => state.setupStatus);
   const playerError = usePlayerStore(state => state.errorMessage);
@@ -60,7 +62,10 @@ export function RadioScreen() {
       isPlaying={player.isPlaying}
       playerPhase={player.phase}
       isDisabled={isPlayerDisabled}
+      isFavorite={favorites.favoriteIds.has(item.id)}
+      isFavoriteBusy={favorites.pendingStationId === item.id}
       onPress={handleStationPress}
+      onToggleFavorite={favorites.toggle}
     />
   );
 
@@ -102,7 +107,7 @@ export function RadioScreen() {
   ) : undefined;
 
   return (
-    <View className={radioScreenStyles.container}>
+    <View className={radioScreenStyles.container} testID="screen-radio">
       <View className={radioScreenStyles.header}>
         <Text className={radioScreenStyles.eyebrow}>Live audio</Text>
         <Text className={radioScreenStyles.title}>Radio</Text>
@@ -119,6 +124,7 @@ export function RadioScreen() {
           placeholder="Search stations"
           placeholderTextColor="#64748b"
           returnKeyType="search"
+          testID="radio-search-input"
           value={catalog.searchText}
         />
 
@@ -143,6 +149,11 @@ export function RadioScreen() {
             {catalog.errorMessage}
           </Text>
         ) : null}
+        {favorites.errorMessage ? (
+          <Text className={radioScreenStyles.catalogNotice}>
+            {favorites.errorMessage}
+          </Text>
+        ) : null}
       </View>
 
       <FlatList
@@ -160,6 +171,7 @@ export function RadioScreen() {
         refreshing={catalog.isRefreshing}
         renderItem={renderStation}
         showsVerticalScrollIndicator={false}
+        testID="radio-station-list"
       />
     </View>
   );

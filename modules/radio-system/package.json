@@ -1,7 +1,7 @@
 {
   "name": "@radio/radio-system",
   "version": "0.0.0",
-  "description": "Android system integration for Radio background playback",
+  "description": "Android power management and live-radio recovery for Radio",
   "main": "src/index",
   "codegenConfig": {
     "name": "RadioSystemSpec",

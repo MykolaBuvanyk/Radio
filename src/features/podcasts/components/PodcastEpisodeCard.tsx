@@ -9,9 +9,11 @@ type PodcastEpisodeCardProps = {
   download: EpisodeDownload | null;
   isBusy: boolean;
   isDownloadBusy: boolean;
+  isDeleteBusy: boolean;
   isQueued: boolean;
   onAddToQueue: (episode: PodcastEpisode) => void;
   onDownloadAction: (episode: PodcastEpisode, download: EpisodeDownload | null) => void;
+  onDelete: (episode: PodcastEpisode) => void;
   onPlay: (episode: PodcastEpisode) => void;
 };
 
@@ -77,15 +79,19 @@ export function PodcastEpisodeCard({
   episode,
   isBusy,
   isDownloadBusy,
+  isDeleteBusy,
   isQueued,
   onAddToQueue,
   onDownloadAction,
+  onDelete,
   onPlay,
 }: PodcastEpisodeCardProps) {
   const duration = formatDuration(episode.durationSeconds);
 
   return (
-    <View className={podcastEpisodeCardStyles.container}>
+    <View
+      className={podcastEpisodeCardStyles.container}
+      testID={`podcast-episode-${episode.id}`}>
       <Text className={podcastEpisodeCardStyles.date}>
         {formatPublishedAt(episode.publishedAt)}
       </Text>
@@ -111,7 +117,8 @@ export function PodcastEpisodeCard({
           accessibilityLabel={`Play ${episode.title}`}
           className={podcastEpisodeCardStyles.playButton}
           disabled={isBusy}
-          onPress={() => onPlay(episode)}>
+          onPress={() => onPlay(episode)}
+          testID={`episode-play-${episode.id}`}>
           <Text className={podcastEpisodeCardStyles.playButtonText}>
             {isBusy ? 'Loading…' : 'Play'}
           </Text>
@@ -121,7 +128,8 @@ export function PodcastEpisodeCard({
           accessibilityLabel={`Add ${episode.title} to queue`}
           className={podcastEpisodeCardStyles.queueButton}
           disabled={isBusy || isQueued}
-          onPress={() => onAddToQueue(episode)}>
+          onPress={() => onAddToQueue(episode)}
+          testID={`episode-queue-${episode.id}`}>
           <Text className={podcastEpisodeCardStyles.queueButtonText}>
             {isQueued ? 'Queued' : 'Add to queue'}
           </Text>
@@ -131,9 +139,21 @@ export function PodcastEpisodeCard({
           accessibilityLabel={`${getDownloadLabel(download)} ${episode.title}`}
           className={podcastEpisodeCardStyles.downloadButton}
           disabled={isDownloadBusy || download?.status === 'completed'}
-          onPress={() => onDownloadAction(episode, download)}>
+          onPress={() => onDownloadAction(episode, download)}
+          testID={`episode-download-${episode.id}`}>
           <Text className={podcastEpisodeCardStyles.downloadButtonText}>
             {isDownloadBusy ? 'Updating…' : getDownloadLabel(download)}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete ${episode.title}`}
+          className={podcastEpisodeCardStyles.deleteButton}
+          disabled={isDeleteBusy || isBusy || isDownloadBusy}
+          onPress={() => onDelete(episode)}
+          testID={`episode-delete-${episode.id}`}>
+          <Text className={podcastEpisodeCardStyles.deleteButtonText}>
+            {isDeleteBusy ? 'Deleting…' : 'Delete episode'}
           </Text>
         </Pressable>
       </View>

@@ -65,7 +65,9 @@ export function DownloadCard({
   const canResume = item.status === 'paused' || item.status === 'failed';
 
   return (
-    <View className={downloadCardStyles.container}>
+    <View
+      className={downloadCardStyles.container}
+      testID={`download-item-${item.episodeId}`}>
       <Text className={downloadCardStyles.status}>{getStatusLabel(item)}</Text>
       <Text className={downloadCardStyles.title}>{item.episodeTitle}</Text>
       <Text className={downloadCardStyles.podcast}>{item.podcastTitle}</Text>

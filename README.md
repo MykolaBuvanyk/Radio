@@ -26,6 +26,24 @@ Zustand is used only for transient UI/player state. SQLite is the persistent
 source of truth. Native libraries are accessed through infrastructure adapters,
 so library-specific types do not enter the app domain.
 
+## End-to-end tests
+
+Android user journeys are covered by the Maestro flows in `.maestro`. Stable
+React Native `testID` values are used for navigation, dynamic catalog cards,
+player controls, subscriptions, episodes, downloads, and the local library.
+
+- `npm run e2e:android:smoke` checks clean startup, SQLite initialization,
+  navigation, empty states, and local feed URL validation without relying on a
+  successful external API response.
+- `npm run e2e:android:network` checks the Radio Browser catalog, favorites,
+  live playback, sleep timer, RSS subscription, episode playback speed, the
+  persisted queue, and subscription deletion.
+- `npm run e2e:android` runs the complete suite.
+
+The debug app must be installed, Metro must be running, and an Android emulator
+or device must be connected. See `.maestro/README.md` for setup, environment
+overrides, and the system scenarios that remain manual.
+
 ## Podcast feeds
 
 The Podcasts tab accepts public HTTP or HTTPS RSS/Atom feed URLs. Feed payloads
@@ -129,8 +147,30 @@ The current player configuration includes:
 - live-edge recovery for live radio streams.
 
 The custom `RadioSystem` Kotlin Turbo Module does not control audio. It exposes
-battery-optimization status and settings to the Library screen, and emits a
-typed event when the status changes after returning to the app.
+battery-optimization status and settings to the Library screen. It also owns a
+live-radio recovery controller that observes Android connectivity, applies a
+bounded exponential retry policy, detects stalled buffering, collects session
+statistics, and emits typed retry events to JavaScript. Track Player remains the
+only component that reloads media or controls audio.
+
+Live-radio recovery uses five attempts with delays of 1, 2, 4, 8, and 16
+seconds, capped at 30 seconds. A stream that remains buffering for 12 seconds is
+reloaded. If the device is offline, retry attempts pause without consuming the
+attempt budget and resume 500 ms after connectivity returns. Switching between
+Wi-Fi, cellular, Ethernet, and VPN is recorded, while network and unknown player
+errors enter the retry flow. Source errors such as HTTP 404 and decoder errors
+remain terminal because retrying the same invalid source would not help.
+
+The mini player includes a native sleep timer with 15, 30, 45, and 60-minute
+presets. The countdown lives inside Track Player rather than a JavaScript
+timeout, so it continues while the application is backgrounded. Playback fades
+out over the final 15 seconds, and the timer can be replaced or cancelled from
+the mini player.
+
+Podcast episodes support playback speeds from 0.5x through 2x. The selected
+episode speed is retained for the current application session and reapplied
+when a podcast queue replaces live radio. Live streams always use 1x so speed
+processing cannot move playback away from the live edge.
 
 ## Battery optimization and OEM limitations
 

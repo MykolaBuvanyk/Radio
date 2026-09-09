@@ -494,3 +494,25 @@ export async function listDailyListeningSummary(
 
   return dailySummaryRowSchema.array().parse(result.rows);
 }
+
+export function observeDailyListeningSummary(
+  sinceTimestamp: number,
+  onChange: (entries: DailyListeningSummary[]) => void,
+  onError?: (error: Error) => void,
+) {
+  return observeDatabaseQuery({
+    query: `SELECT
+              strftime('%Y-%m-%d', started_at / 1000, 'unixepoch', 'localtime') AS day,
+              SUM(listened_seconds) AS listenedSeconds,
+              COUNT(*) AS sessionCount
+            FROM listening_history
+            WHERE started_at >= ?
+            GROUP BY day
+            ORDER BY day ASC`,
+    parameters: [sinceTimestamp],
+    tables: ['listening_history'],
+    mapRows: rows => dailySummaryRowSchema.array().parse(rows),
+    onChange,
+    onError,
+  });
+}

@@ -7,6 +7,7 @@ import {
 } from '../infrastructure/podcastRepository';
 import {
   PODCAST_EPISODE_PAGE_SIZE,
+  removePodcastEpisode,
   refreshPodcastSubscription,
 } from '../services/podcastSubscriptionService';
 
@@ -18,6 +19,7 @@ export function usePodcastEpisodes(podcastId: string) {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingDeletionId, setPendingDeletionId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const isMounted = useRef(true);
@@ -119,13 +121,42 @@ export function usePodcastEpisodes(podcastId: string) {
     }
   };
 
+  const removeEpisode = async (episodeId: string) => {
+    if (pendingDeletionId) {
+      return false;
+    }
+
+    setPendingDeletionId(episodeId);
+    setErrorMessage(null);
+
+    try {
+      await removePodcastEpisode(episodeId);
+      return true;
+    } catch (error) {
+      if (isMounted.current) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'The episode could not be deleted.',
+        );
+      }
+      return false;
+    } finally {
+      if (isMounted.current) {
+        setPendingDeletionId(null);
+      }
+    }
+  };
+
   return {
     episodes,
     errorMessage,
     isLoading,
     isRefreshing,
     loadMore,
+    pendingDeletionId,
     podcastTitle,
     refresh,
+    removeEpisode,
   };
 }

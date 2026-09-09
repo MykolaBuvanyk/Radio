@@ -46,7 +46,8 @@ export function PlaybackQueueCard({
         isCurrent
           ? playbackQueueCardStyles.activeContainer
           : playbackQueueCardStyles.container
-      }>
+      }
+      testID={`queue-item-${item.id}`}>
       <View className={playbackQueueCardStyles.topRow}>
         <View className={playbackQueueCardStyles.metadata}>
           <Text className={playbackQueueCardStyles.eyebrow}>

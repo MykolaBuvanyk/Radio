@@ -145,6 +145,10 @@ export function registerTrackPlayerSession(
       callbacks.onError(event.code);
     });
 
+    TrackPlayer.addEventListener(Event.PlaybackStateChanged, event => {
+      callbacks.onPlaybackStateChanged(mapPlaybackState(event.state));
+    });
+
     TrackPlayer.addEventListener(Event.IsPlayingChanged, event => {
       callbacks.onIsPlayingChanged(event.playing);
     });
@@ -185,12 +189,73 @@ export function pausePlayback() {
   TrackPlayer.pause();
 }
 
+export function setNativePlaybackSpeed(speed: number) {
+  TrackPlayer.setPlaybackSpeed(speed);
+}
+
+export function setNativeSleepTimer(
+  seconds: number,
+  fadeOutSeconds: number,
+) {
+  TrackPlayer.sleepAfterTime(seconds, {fadeOutSeconds});
+}
+
+export function getNativeSleepTimer() {
+  return TrackPlayer.getSleepTimer();
+}
+
+export function cancelNativeSleepTimer() {
+  TrackPlayer.cancelSleepTimer();
+}
+
+export function addSleepTimerTriggeredListener(listener: () => void) {
+  return TrackPlayer.addEventListener(Event.SleepTimerTriggered, listener);
+}
+
+export function recoverLivePlayback(forceReload: boolean) {
+  if (forceReload) {
+    const activeMediaItem = TrackPlayer.getActiveMediaItem();
+
+    if (activeMediaItem) {
+      TrackPlayer.setMediaItem(activeMediaItem);
+    }
+  } else {
+    TrackPlayer.retry();
+  }
+
+  TrackPlayer.play();
+}
+
 export function isPlaybackActive() {
   return TrackPlayer.isPlaying();
 }
 
 export function getActiveMediaId() {
   return TrackPlayer.getActiveMediaItem()?.mediaId ?? null;
+}
+
+export function getActiveMediaType() {
+  return readMediaType(TrackPlayer.getActiveMediaItem());
+}
+
+export function getActiveMediaSummary() {
+  const mediaItem = TrackPlayer.getActiveMediaItem();
+  const mediaType = readMediaType(mediaItem);
+
+  if (!mediaItem || !mediaType) {
+    return null;
+  }
+
+  return {
+    mediaId: mediaItem.mediaId,
+    mediaType,
+    title: mediaItem.title,
+    subtitle: mediaItem.artist ?? null,
+  };
+}
+
+export function getPlaybackPhase() {
+  return mapPlaybackState(TrackPlayer.getPlaybackState());
 }
 
 export function mapPlaybackState(state: PlaybackState): PlayerPhase {

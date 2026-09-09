@@ -1,0 +1,42 @@
+appId: com.radioapp
+name: Radio favorite and playback controls
+tags:
+  - network
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "radio-station-.*"
+    timeout: 30000
+- tapOn:
+    id: "radio-favorite-.*"
+    index: 0
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "favorite-station-.*"
+    timeout: 10000
+- tapOn:
+    id: "favorite-play-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "mini-player"
+    timeout: 10000
+- tapOn:
+    id: "sleep-timer-trigger"
+- assertVisible:
+    id: "sleep-timer-modal"
+- tapOn:
+    id: "sleep-timer-15"
+- assertVisible: "Sleep 15 min"
+- tapOn:
+    id: "mini-player-toggle"
+- assertVisible: "Play"
+- tapOn:
+    id: "favorite-remove-.*"
+    index: 0
+- assertNotVisible:
+    id: "favorite-station-.*"

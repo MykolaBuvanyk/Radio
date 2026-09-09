@@ -386,6 +386,22 @@ export async function getPodcastEpisode(id: string) {
   return row ? mapEpisodeRow(row) : null;
 }
 
+export async function listPodcastEpisodeIds(podcastId: string) {
+  const database = await getDatabase();
+  const result = await database.execute(
+    `SELECT id
+     FROM podcast_episodes
+     WHERE podcast_id = ?`,
+    [podcastId],
+  );
+
+  return z
+    .object({id: z.string()})
+    .array()
+    .parse(result.rows)
+    .map(row => row.id);
+}
+
 export async function deletePodcastEpisode(id: string) {
   const database = await getDatabase();
   let cachedFileUris: string[] = [];

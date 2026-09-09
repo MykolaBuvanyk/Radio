@@ -2,7 +2,10 @@ import {useEffect, useRef, useState} from 'react';
 
 import type {PodcastSubscription} from '../domain/podcast';
 import {observePodcastSubscriptions} from '../infrastructure/podcastRepository';
-import {subscribeToPodcast} from '../services/podcastSubscriptionService';
+import {
+  removePodcastSubscription,
+  subscribeToPodcast,
+} from '../services/podcastSubscriptionService';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error
@@ -14,6 +17,7 @@ export function usePodcastSubscriptions() {
   const [subscriptions, setSubscriptions] = useState<PodcastSubscription[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
   const isMounted = useRef(true);
@@ -72,11 +76,36 @@ export function usePodcastSubscriptions() {
     }
   };
 
+  const removeSubscription = async (podcastId: string) => {
+    if (pendingRemovalId) {
+      return false;
+    }
+
+    setPendingRemovalId(podcastId);
+    setErrorMessage(null);
+
+    try {
+      await removePodcastSubscription(podcastId);
+      return true;
+    } catch (error) {
+      if (isMounted.current) {
+        setErrorMessage(getErrorMessage(error));
+      }
+      return false;
+    } finally {
+      if (isMounted.current) {
+        setPendingRemovalId(null);
+      }
+    }
+  };
+
   return {
     addSubscription,
     errorMessage,
     isLoading,
     isSubmitting,
+    pendingRemovalId,
+    removeSubscription,
     subscriptions,
   };
 }

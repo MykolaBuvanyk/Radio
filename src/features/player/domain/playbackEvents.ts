@@ -1,4 +1,5 @@
 import type {PersistedMediaType} from './persistence';
+import type {PlayerPhase} from './playerSnapshot';
 
 export type PlaybackErrorKind =
   | 'network'
@@ -29,4 +30,5 @@ export type PlaybackSessionCallbacks = {
   onProgress: (
     checkpoint: PlaybackProgressCheckpoint,
   ) => void | Promise<void>;
+  onPlaybackStateChanged: (phase: PlayerPhase) => void;
 };

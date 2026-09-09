@@ -1,0 +1,53 @@
+appId: com.radioapp
+name: Podcast subscription, queue, and playback speed
+tags:
+  - network
+env:
+  PODCAST_FEED_URL: "https://feeds.npr.org/510289/podcast.xml"
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "screen-radio"
+    timeout: 20000
+- tapOn:
+    id: "tab-podcasts"
+- tapOn:
+    id: "podcast-feed-input"
+- inputText: ${PODCAST_FEED_URL}
+- hideKeyboard
+- tapOn:
+    id: "podcast-add-button"
+- extendedWaitUntil:
+    visible:
+      id: "podcast-subscription-.*"
+    timeout: 30000
+- tapOn:
+    id: "podcast-open-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "podcast-episode-.*"
+    timeout: 15000
+- tapOn:
+    id: "episode-play-.*"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "mini-player"
+    timeout: 10000
+- tapOn:
+    id: "playback-speed-trigger"
+- assertVisible:
+    id: "playback-speed-modal"
+- tapOn:
+    id: "playback-speed-1_5"
+- assertVisible: "1.5x"
+- back
+- tapOn:
+    id: "tab-queue"
+- assertVisible:
+    id: "screen-queue"
+- assertVisible:
+    id: "queue-item-.*"

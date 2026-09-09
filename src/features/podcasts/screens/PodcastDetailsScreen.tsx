@@ -1,6 +1,7 @@
 import type {StaticScreenProps} from '@react-navigation/native';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Text,
   View,
@@ -56,15 +57,33 @@ export function PodcastDetailsScreen({route}: PodcastDetailsScreenProps) {
       downloads.resume(episode.id).catch(() => undefined);
     }
   };
+  const handleDelete = (episode: PodcastEpisode) => {
+    Alert.alert(
+      'Delete episode?',
+      `This removes ${episode.title} from this device, including its queue item and downloaded file.`,
+      [
+        {style: 'cancel', text: 'Cancel'},
+        {
+          style: 'destructive',
+          text: 'Delete',
+          onPress: () => {
+            podcast.removeEpisode(episode.id).catch(() => undefined);
+          },
+        },
+      ],
+    );
+  };
   const renderEpisode = ({item}: ListRenderItemInfo<PodcastEpisode>) => (
     <PodcastEpisodeCard
       download={downloads.downloadsByEpisodeId.get(item.id) ?? null}
       episode={item}
       isBusy={playbackQueue.pendingEpisodeId === item.id}
+      isDeleteBusy={podcast.pendingDeletionId === item.id}
       isDownloadBusy={downloads.pendingEpisodeId === item.id}
       isQueued={playbackQueue.queuedEpisodeIds.has(item.id)}
       onAddToQueue={handleAddToQueue}
       onDownloadAction={handleDownloadAction}
+      onDelete={handleDelete}
       onPlay={handlePlay}
     />
   );
@@ -130,6 +149,7 @@ export function PodcastDetailsScreen({route}: PodcastDetailsScreenProps) {
       refreshing={podcast.isRefreshing}
       renderItem={renderEpisode}
       showsVerticalScrollIndicator={false}
+      testID="screen-podcast-details"
     />
   );
 }

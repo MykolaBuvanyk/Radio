@@ -1,0 +1,10 @@
+flows:
+  - "flows/*.yaml"
+testOutputDir: .maestro/artifacts
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - app_navigation
+    - radio_playback
+    - podcast_queue
+    - podcast_removal

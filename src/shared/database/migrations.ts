@@ -5,7 +5,7 @@ type DatabaseMigration = {
   statements: readonly string[];
 };
 
-const CURRENT_DATABASE_VERSION = 3;
+const CURRENT_DATABASE_VERSION = 4;
 
 const migrations: readonly DatabaseMigration[] = [
   {
@@ -139,6 +139,29 @@ const migrations: readonly DatabaseMigration[] = [
       ) STRICT`,
       `INSERT INTO download_cache_settings (id, max_size_bytes, updated_at)
        VALUES (1, 524288000, 0)`,
+    ],
+  },
+  {
+    version: 4,
+    statements: [
+      `CREATE TABLE radio_favorites (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        country TEXT NOT NULL,
+        country_code TEXT NOT NULL,
+        genre TEXT NOT NULL,
+        tags_json TEXT NOT NULL DEFAULT '[]',
+        stream_url TEXT NOT NULL,
+        homepage_url TEXT,
+        favicon_url TEXT,
+        codec TEXT,
+        bitrate INTEGER CHECK (bitrate IS NULL OR bitrate >= 0),
+        mime_type TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      ) STRICT`,
+      `CREATE INDEX radio_favorites_name_idx
+        ON radio_favorites (name COLLATE NOCASE ASC)`,
     ],
   },
 ];

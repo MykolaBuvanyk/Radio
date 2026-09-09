@@ -94,6 +94,7 @@ export function QueueScreen() {
       onDragEnd={handleDragEnd}
       renderItem={renderQueueItem}
       showsVerticalScrollIndicator={false}
+      testID="screen-queue"
     />
   );
 }
