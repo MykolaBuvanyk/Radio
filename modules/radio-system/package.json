@@ -1,0 +1,28 @@
+{
+  "name": "@radio/radio-system",
+  "version": "0.0.0",
+  "description": "Android system integration for Radio background playback",
+  "main": "src/index",
+  "codegenConfig": {
+    "name": "RadioSystemSpec",
+    "type": "modules",
+    "jsSrcsDir": "src",
+    "android": {
+      "javaPackageName": "com.radio.radiosystem"
+    }
+  },
+  "author": " <> ()",
+  "license": "MIT",
+  "homepage": "#readme",
+  "create-react-native-library": {
+    "type": "turbo-module",
+    "languages": "kotlin-objc",
+    "tools": [
+      "eslint",
+      "jest",
+      "lefthook",
+      "release-it"
+    ],
+    "version": "0.63.1"
+  }
+}

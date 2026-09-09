@@ -1,97 +1,245 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Radio
 
-# Getting Started
+Radio is a React Native CLI application for live radio and podcasts. The app
+uses TypeScript, NativeWind, SQLite, `@rntp/player`, and a local Kotlin Turbo
+Module.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Current architecture
 
-## Step 1: Start Metro
+Application code is organized by feature:
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- `src/app` owns bootstrap, providers, and navigation.
+- `src/features/radio` owns Radio Browser catalog and live-station playback.
+- `src/features/podcasts` owns RSS/Atom fetching, feed parsing, subscriptions,
+  and the paginated episode catalog.
+- `src/features/player` owns the app-facing player domain, state, persistence,
+  and the Track Player adapter.
+- `src/features/queue` owns episode queue workflows and the draggable queue UI.
+- `src/features/downloads` owns resumable transfers, offline file resolution,
+  download state, and cache eviction.
+- `src/features/system` owns Android system and power-management integration.
+- `src/shared/database` owns SQLite setup and schema migrations.
+- `modules/radio-system` is a local New Architecture native module. Its typed
+  TypeScript spec is the contract between the app and Kotlin/Objective-C++.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Zustand is used only for transient UI/player state. SQLite is the persistent
+source of truth. Native libraries are accessed through infrastructure adapters,
+so library-specific types do not enter the app domain.
 
-```sh
-# Using npm
-npm start
+## Podcast feeds
 
-# OR using Yarn
-yarn start
-```
+The Podcasts tab accepts public HTTP or HTTPS RSS/Atom feed URLs. Feed payloads
+are treated as untrusted data and normalized before they enter the domain or
+SQLite:
 
-## Step 2: Build and run your app
+- network requests have a 15-second timeout and an 8 MB response limit;
+- ETag and Last-Modified validators avoid downloading unchanged feeds;
+- RSS 2.0, Atom, iTunes fields, CDATA, HTML descriptions, common entities, and
+  multiple date/duration formats are normalized;
+- episodes without a title or valid HTTP(S) audio enclosure are skipped;
+- missing enclosure sizes and optional metadata remain nullable;
+- subscription and episode updates are written in one SQLite transaction;
+- each sync imports at most the 200 newest playable episodes, while the UI reads the
+  local catalog in virtualized pages of 30 items.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+RSS does not define a universal server-side pagination mechanism. Limiting each
+sync prevents unusually large archives from expanding the local database and UI
+without bounds while still retaining a useful recent catalog.
 
-### Android
+## Playback queue and episode progress
 
-```sh
-# Using npm
-npm run android
+The episode queue is persisted in SQLite and projected into Track Player only
+when podcast playback starts. Starting live radio replaces the native runtime
+queue but does not erase the saved podcast queue.
 
-# OR using Yarn
-yarn android
-```
+- Episodes can be played immediately or appended from the podcast details
+  screen.
+- The Queue tab supports long-press drag-and-drop ordering, play/pause, and
+  removal.
+- Queue writes are serialized and stored transactionally before the matching
+  native queue operation runs.
+- Track Player receives the complete ordered queue, so automatic transitions
+  and native Next/Previous controls continue without depending on a mounted UI.
+- The persistent queue is limited to 500 items.
 
-### iOS
+Episode progress checkpoints are emitted by the native player every 10 seconds.
+Only podcast episode checkpoints are written to SQLite. A final checkpoint is
+also emitted when playback pauses, while the app lifecycle flushes any pending
+write before entering the background. This avoids a database write every second
+while limiting position loss if the UI process disappears.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+When an episode is selected or reached through automatic queue transition, its
+saved position is restored with a five-second rewind. Completed episodes start
+from the beginning. An episode is considered completed after reaching 98% or
+the final 15 seconds.
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+## Offline episode downloads
 
-```sh
-bundle install
-```
+Episode audio is downloaded directly to the application document directory by
+the native filesystem/network adapter. File bytes never cross the JavaScript
+bridge. SQLite remains the source of truth for queued, downloading, paused,
+failed, and completed states.
 
-Then, and every time you update your native dependencies, run:
+- Up to two episodes download concurrently.
+- Progress events are limited to four per second and SQLite checkpoints are
+  throttled further by time and byte count.
+- Pausing cancels the active native request, commits its downloaded segment to
+  a `.part` file, and resumes later with an HTTP `Range` request.
+- A server that ignores `Range` and returns `200` replaces the partial file
+  safely instead of appending duplicate bytes.
+- HTTP status, `Content-Range`, response length, and the final on-disk size are
+  checked before a file is marked complete.
+- Interrupted in-progress database rows return to the queue after application
+  startup and continue from an existing partial file.
+- Completed files are selected instead of remote enclosure URLs when a podcast
+  queue is activated, so they remain playable in airplane mode.
+- Cache limits of 250 MB, 500 MB, or 1 GB are available in Downloads. The least
+  recently played completed episodes are evicted first; the currently playing
+  episode is never evicted.
+- Removing a download deletes its file and database row. Podcast/episode
+  deletion services also delete the local and partial files returned by the
+  cascading SQLite operation.
 
-```sh
-bundle exec pod install
-```
+`react-native-blob-util` uses an iOS background task for transfers. On Android,
+the native request can continue while the app is backgrounded as long as the
+process remains alive; playback's foreground service improves survival while
+audio is active. A force-stop, OEM process kill, reboot, or iOS background-time
+expiration can stop the network request. The persisted partial file is resumed
+the next time the app starts. Android DownloadManager is intentionally not used
+because it cannot provide the same app-controlled pause/append workflow and
+stores files outside this private cache lifecycle.
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## Android background playback
 
-```sh
-# Using npm
-npm run ios
+`@rntp/player` is the only owner of playback, the foreground media service,
+and the Android MediaSession. It provides the ongoing media notification and
+native remote controls. The app intentionally does not register a second audio
+service or MediaSession because two competing owners can produce duplicated
+notifications, conflicting commands, and incorrect playback state.
 
-# OR using Yarn
-yarn ios
-```
+The current player configuration includes:
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+- a media-playback foreground service and persistent media notification;
+- MediaSession controls for play/pause, stop, next/previous, and 30-second seek
+  actions;
+- exclusive audio focus handling for calls, alarms, and other players;
+- pause handling for a disconnected wired or Bluetooth audio route;
+- a network wake mode for live streams;
+- continued playback after the app is removed from Android recents;
+- live-edge recovery for live radio streams.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+The custom `RadioSystem` Kotlin Turbo Module does not control audio. It exposes
+battery-optimization status and settings to the Library screen, and emits a
+typed event when the status changes after returning to the app.
 
-## Step 3: Modify your app
+## Battery optimization and OEM limitations
 
-Now that you have successfully run the app, let's make changes!
+Android Doze and App Standby can restrict background CPU and network access.
+The Library screen shows the current battery-optimization status. A direct
+`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` system prompt is opened only after the
+user explicitly presses **Allow unrestricted battery use**. The app never
+requests this exemption during startup. A general battery-optimization settings
+screen is also available as a fallback.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+An exemption improves reliability but does not make a process immortal.
+Xiaomi/Redmi/Poco, Huawei/Honor, Oppo/Realme/OnePlus, Vivo, Samsung, Asus, and
+Meizu firmware may add proprietary battery managers, auto-start restrictions,
+or background-process limits. Their option names and behavior vary by device
+and OS release. Users may still need to allow auto-start, remove the app from a
+sleeping-app list, or choose an unrestricted battery mode in the manufacturer's
+settings. Android does not provide one standard API that can guarantee or force
+these vendor-specific permissions.
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+Direct battery-optimization exemption requests are subject to Android and app
+store policy. This pet project currently targets local/sideloaded builds. Before
+publishing through Google Play or another store, review the current distribution
+policy and consider removing the direct exemption request while keeping the
+general settings shortcut.
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## Manual Android test checklist
 
-## Congratulations! :tada:
+Use a physical Android device for meaningful background and audio-focus tests:
 
-You've successfully run and modified your React Native App. :partying_face:
+1. Start a radio station and lock the screen. Confirm audio continues and the
+   media notification shows the station metadata.
+2. Use play/pause from the lock screen and notification.
+3. Send the app to the background and remove it from recents. Confirm playback
+   continues.
+4. Disconnect wired headphones or the active Bluetooth route. Confirm playback
+   pauses instead of moving unexpectedly to the speaker.
+5. Start another media app or simulate an interruption. Confirm Radio yields
+   audio focus and can resume appropriately after the interruption.
+6. Turn off connectivity for 10 seconds, restore it, and observe the buffering
+   and recovery behavior.
+7. Open **Library → Background playback**, request unrestricted battery use,
+   return to Radio, and confirm the status updates.
+8. Repeat the locked-screen test after the device has been idle long enough to
+   enter Doze. Vendor-specific battery settings may still be required.
 
-### Now what?
+The **Next** and ±30-second controls are registered now for the podcast queue.
+For the current single-item live-radio source, seeking may not be available and
+Next has no following item to select.
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+## Manual podcast test checklist
 
-# Troubleshooting
+1. Open **Podcasts**, paste a public RSS feed URL, and press **Add podcast**.
+2. Confirm the subscription appears with its title, author, and last sync date.
+3. Open the subscription and scroll through the episode catalog. Confirm more
+   local rows appear as the list approaches the end.
+4. Pull down to refresh. An unchanged feed should keep the existing episodes
+   and update its sync timestamp through HTTP cache validators when supported.
+5. Try an invalid URL, an HTML page, a feed with broken enclosure URLs, and an
+   unreachable host. Confirm the app shows an error instead of saving invalid
+   domain data.
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+## Manual queue and position test checklist
 
-# Learn More
+1. Open a podcast and press **Add to queue** on several episodes. Confirm each
+   episode appears once in the Queue tab.
+2. Long-press **Hold to drag**, move an episode, leave the tab, and return.
+   Confirm the new order remains.
+3. Play an item in the middle of the queue. Confirm its metadata appears in the
+   mini player and native media notification.
+4. Let the episode finish. Confirm the following queue item starts
+   automatically, and test Next/Previous from the notification or lock screen.
+5. Listen beyond the first 10-second checkpoint, pause, play another episode,
+   then return to the first one. Confirm it resumes roughly five seconds before
+   the saved position.
+6. Background or swipe away the application while an episode is playing, wait
+   for another checkpoint, then reopen it and confirm the position was retained.
+7. Remove an inactive queue item and confirm the remaining order is compact.
+   Remove the active item and confirm Track Player advances or stops when no
+   items remain.
 
-To learn more about React Native, take a look at the following resources:
+## Manual download and offline test checklist
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+1. Open a podcast and press **Download** on two or more episodes. Open
+   **Downloads** and confirm at most two items actively progress.
+2. Pause an active download, note its byte count, resume it, and confirm it
+   continues rather than restarting when the host supports byte ranges.
+3. Disable connectivity during a transfer. Confirm the item shows a retryable
+   error, restore connectivity, and press **Resume**.
+4. Complete a download, enable airplane mode, add the episode to the queue, and
+   play it. Confirm playback and position restoration use the local file.
+5. Restart the app during a partial download. Confirm the row returns to the
+   queue and resumes from the saved partial file.
+6. Lower the storage limit below the completed cache size. Confirm older files
+   are removed while the currently playing download is retained.
+7. Remove a completed item from Downloads and confirm it disappears and no
+   longer contributes to used storage.
+8. Fill device storage or test on a nearly full emulator. Confirm the item
+   fails with a storage-specific message and can be removed or retried.
+
+## Development rules
+
+- All user-facing application text is written in English.
+- NativeWind classes are kept in dedicated `*.styles.ts` files.
+- TypeScript strict mode remains enabled.
+- Do not run builds, Gradle tasks, CocoaPods, Metro, lint, tests, type-checking,
+  or formatters unless the project owner explicitly requests it.
+
+## Running later
+
+When execution is explicitly requested, start Metro with `npm start` and run
+Android with `npm run android`. Native dependency changes require a fresh native
+build; Fast Refresh alone cannot load a newly added native module.
