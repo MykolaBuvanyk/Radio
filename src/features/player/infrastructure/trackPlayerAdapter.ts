@@ -61,6 +61,21 @@ export function replaceQueueWithMediaItem(mediaItem: MediaItem) {
   TrackPlayer.setMediaItem(mediaItem);
 }
 
+export function replaceQueueWithMediaItems(
+  mediaItems: readonly MediaItem[],
+  activeMediaId: string,
+) {
+  const activeIndex = mediaItems.findIndex(
+    mediaItem => mediaItem.mediaId === activeMediaId,
+  );
+
+  if (activeIndex < 0) {
+    throw new Error('The selected media item is not in the playback context.');
+  }
+
+  TrackPlayer.setMediaItems([...mediaItems], activeIndex);
+}
+
 function readMediaType(mediaItem: MediaItem | null): PersistedMediaType | null {
   const mediaType = mediaItem?.extras?.mediaType;
 
@@ -185,6 +200,14 @@ export function startPlayback() {
   TrackPlayer.play();
 }
 
+export function skipToNextPlaybackItem() {
+  TrackPlayer.skipToNext();
+}
+
+export function skipToPreviousPlaybackItem() {
+  TrackPlayer.skipToPrevious();
+}
+
 export function pausePlayback() {
   TrackPlayer.pause();
 }
@@ -243,6 +266,10 @@ export function getActiveMediaSummary() {
   const mediaType = readMediaType(mediaItem);
 
   if (!mediaItem || !mediaType) {
+    return null;
+  }
+
+  if (!mediaItem.mediaId || !mediaItem.title) {
     return null;
   }
 

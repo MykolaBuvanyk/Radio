@@ -64,10 +64,14 @@ export function useEpisodeQueueActions() {
       'The episode could not be added to the queue.',
     );
 
-  const playEpisode = (episode: PodcastEpisode, podcastTitle: string) =>
+  const playEpisode = (
+    episode: PodcastEpisode,
+    podcastTitle: string,
+    context?: readonly PodcastEpisode[],
+  ) =>
     runEpisodeAction(
       episode,
-      () => playEpisodeFromCatalog(episode, podcastTitle),
+      () => playEpisodeFromCatalog(episode, podcastTitle, context),
       'The episode could not be played.',
     );
 

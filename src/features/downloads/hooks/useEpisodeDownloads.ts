@@ -17,7 +17,9 @@ import {
   removeDownload,
   resumeDownload,
   setDownloadCacheLimit,
+  subscribeDownloadProgress,
 } from '../services/downloadManager';
+import {playDownloadedEpisode} from '../../queue/services/playbackQueueService';
 
 const DEFAULT_CACHE_SETTINGS: DownloadCacheSettings = {
   maxSizeBytes: 500 * 1024 * 1024,
@@ -111,10 +113,25 @@ export function useDownloadLibrary() {
       setSettings,
       error => setErrorMessage(error.message),
     );
+    const unsubscribeProgress = subscribeDownloadProgress(update => {
+      setItems(currentItems =>
+        currentItems.map(item =>
+          item.episodeId === update.episodeId
+            ? {
+                ...item,
+                bytesDownloaded: update.bytesDownloaded,
+                status: 'downloading',
+                totalBytes: update.totalBytes ?? item.totalBytes,
+              }
+            : item,
+        ),
+      );
+    });
 
     return () => {
       unsubscribeItems();
       unsubscribeSettings();
+      unsubscribeProgress();
     };
   }, []);
 
@@ -151,6 +168,17 @@ export function useDownloadLibrary() {
       runItemAction(episodeId, () => pauseDownload(episodeId)),
     [runItemAction],
   );
+  const play = useCallback(
+    (
+      episodeId: string,
+      podcastTitle: string,
+      contextEpisodeIds?: readonly string[],
+    ) =>
+      runItemAction(episodeId, () =>
+        playDownloadedEpisode(episodeId, podcastTitle, contextEpisodeIds),
+      ),
+    [runItemAction],
+  );
   const remove = useCallback(
     (episodeId: string) =>
       runItemAction(episodeId, () => removeDownload(episodeId)),
@@ -174,6 +202,7 @@ export function useDownloadLibrary() {
     maxSizeBytes: settings.maxSizeBytes,
     pendingEpisodeId,
     pause,
+    play,
     remove,
     resume,
     updateLimit,

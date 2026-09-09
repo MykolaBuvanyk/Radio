@@ -49,7 +49,7 @@ export function RadioScreen() {
         return;
       }
 
-      playCatalogStation(station);
+      playCatalogStation(station, catalog.stations);
     } catch {
       reportPlayerError('The station could not be played. Please try again.');
     }

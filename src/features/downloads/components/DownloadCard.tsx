@@ -7,9 +7,12 @@ import {
 } from './DownloadCard.styles';
 
 type DownloadCardProps = {
+  isCurrent: boolean;
+  isPlaying: boolean;
   isPending: boolean;
   item: EpisodeDownloadListItem;
   onPause: (episodeId: string) => void;
+  onPlay: (episodeId: string) => void;
   onRemove: (episodeId: string) => void;
   onResume: (episodeId: string) => void;
 };
@@ -54,9 +57,12 @@ function getStatusLabel(item: EpisodeDownloadListItem) {
 }
 
 export function DownloadCard({
+  isCurrent,
+  isPlaying,
   isPending,
   item,
   onPause,
+  onPlay,
   onRemove,
   onResume,
 }: DownloadCardProps) {
@@ -86,6 +92,24 @@ export function DownloadCard({
         <Text className={downloadCardStyles.error}>{item.errorMessage}</Text>
       ) : null}
       <View className={downloadCardStyles.actions}>
+        {item.status === 'completed' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Play downloaded episode ${item.episodeTitle}`}
+            className={downloadCardStyles.primaryButton}
+            disabled={isPending}
+            onPress={() => onPlay(item.episodeId)}>
+            <Text className={downloadCardStyles.primaryButtonText}>
+              {isPending
+                ? 'Loading…'
+                : isCurrent && isPlaying
+                  ? 'Pause'
+                  : isCurrent
+                    ? 'Resume'
+                    : 'Play'}
+            </Text>
+          </Pressable>
+        ) : null}
         {canPause ? (
           <Pressable
             accessibilityRole="button"

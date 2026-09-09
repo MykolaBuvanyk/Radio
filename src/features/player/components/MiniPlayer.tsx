@@ -2,7 +2,11 @@ import {Pressable, Text, View} from 'react-native';
 
 import type {PlayerPhase} from '../domain/playerSnapshot';
 import {usePlayerSnapshot} from '../infrastructure/usePlayerSnapshot';
-import {togglePlayback} from '../services/playerService';
+import {
+  skipToNext,
+  skipToPrevious,
+  togglePlayback,
+} from '../services/playerService';
 import {usePlayerStore} from '../store/playerStore';
 import {miniPlayerStyles} from './MiniPlayer.styles';
 import {PlaybackSpeedControl} from './PlaybackSpeedControl';
@@ -44,6 +48,22 @@ export function MiniPlayer() {
     }
   };
 
+  const handlePrevious = () => {
+    try {
+      skipToPrevious();
+    } catch {
+      reportError('Previous playback item could not be selected.');
+    }
+  };
+
+  const handleNext = () => {
+    try {
+      skipToNext();
+    } catch {
+      reportError('Next playback item could not be selected.');
+    }
+  };
+
   return (
     <View className={miniPlayerStyles.container} testID="mini-player">
       <View className={miniPlayerStyles.mainRow}>
@@ -65,16 +85,34 @@ export function MiniPlayer() {
           ) : null}
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={player.isPlaying ? 'Pause playback' : 'Play audio'}
-          className={miniPlayerStyles.button}
-          onPress={handlePlaybackToggle}
-          testID="mini-player-toggle">
-          <Text className={miniPlayerStyles.buttonText}>
-            {player.isPlaying ? 'Pause' : 'Play'}
-          </Text>
-        </Pressable>
+        <View className={miniPlayerStyles.playbackButtons}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous playback item"
+            className={miniPlayerStyles.secondaryButton}
+            onPress={handlePrevious}
+            testID="mini-player-previous">
+            <Text className={miniPlayerStyles.secondaryButtonText}>‹</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={player.isPlaying ? 'Pause playback' : 'Play audio'}
+            className={miniPlayerStyles.button}
+            onPress={handlePlaybackToggle}
+            testID="mini-player-toggle">
+            <Text className={miniPlayerStyles.buttonText}>
+              {player.isPlaying ? 'Pause' : 'Play'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next playback item"
+            className={miniPlayerStyles.secondaryButton}
+            onPress={handleNext}
+            testID="mini-player-next">
+            <Text className={miniPlayerStyles.secondaryButtonText}>›</Text>
+          </Pressable>
+        </View>
       </View>
       <View className={miniPlayerStyles.controlsRow}>
         <SleepTimerControl />

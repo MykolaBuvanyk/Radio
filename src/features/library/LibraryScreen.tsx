@@ -75,7 +75,7 @@ export function LibraryScreen() {
         <FavoriteStationCard
           isBusy={favorites.pendingStationId === item.station.id}
           isPlaying={player.mediaId === item.station.id && player.isPlaying}
-          onPlay={playCatalogStation}
+          onPlay={station => playCatalogStation(station, favorites.stations)}
           onRemove={favorites.toggle}
           station={item.station}
         />

@@ -14,7 +14,7 @@ export const playbackSpeedControlStyles = {
     'min-w-20 items-center rounded-full border border-app-border bg-app-surface px-4 py-3 active:opacity-80',
   optionSelected: 'border-app-primary bg-app-primary',
   optionText: 'text-sm font-bold text-app-text',
-  optionTextSelected: 'text-slate-950',
+  optionTextSelected: 'text-sm font-bold text-app-text',
   close: 'mt-4 items-center px-4 py-2 active:opacity-80',
   closeText: 'text-sm font-semibold text-app-muted',
 } as const;

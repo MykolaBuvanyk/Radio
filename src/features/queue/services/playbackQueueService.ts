@@ -24,6 +24,7 @@ import {
 import {createStableId} from '../../../shared/utils/stableId';
 import {resolveDownloadedQueueSources} from '../../downloads/services/downloadManager';
 import {applyPreferredEpisodePlaybackSpeed} from '../../player/services/playbackSpeedService';
+import {getPodcastEpisode} from '../../podcasts/infrastructure/podcastRepository';
 
 const MAX_PLAYBACK_QUEUE_ITEMS = 500;
 
@@ -100,6 +101,7 @@ export function addEpisodeToPlaybackQueue(
 export function playEpisodeFromCatalog(
   episode: PodcastEpisode,
   podcastTitle: string,
+  context: readonly PodcastEpisode[] = [episode],
 ) {
   if (getActiveMediaId() === episode.id) {
     startPlayback();
@@ -107,10 +109,59 @@ export function playEpisodeFromCatalog(
   }
 
   return runQueueMutation(async () => {
-    const item = await appendEpisode(episode, podcastTitle);
-
-    await playPersistedQueue(item.mediaId);
+    await playEpisodeContext(context, episode.id, podcastTitle);
   });
+}
+
+export function playDownloadedEpisode(
+  episodeId: string,
+  podcastTitle: string,
+  contextEpisodeIds: readonly string[] = [episodeId],
+) {
+  if (getActiveMediaId() === episodeId) {
+    return playPersistedQueueItem(episodeId);
+  }
+
+  return runQueueMutation(async () => {
+    const episodes = (
+      await Promise.all(contextEpisodeIds.map(id => getPodcastEpisode(id)))
+    ).filter((episode): episode is PodcastEpisode => episode !== null);
+    const episode = episodes.find(item => item.id === episodeId);
+
+    if (!episode) {
+      throw new Error('This downloaded episode is no longer in the library.');
+    }
+
+    await playEpisodeContext(episodes, episodeId, podcastTitle);
+  });
+}
+
+async function playEpisodeContext(
+  episodes: readonly PodcastEpisode[],
+  activeEpisodeId: string,
+  podcastTitle: string,
+) {
+  const contextIds = new Set(episodes.map(episode => episode.id));
+
+  for (const episode of episodes) {
+    await appendEpisode(episode, podcastTitle);
+  }
+
+  const queue = await listPlaybackQueue();
+  const contextQueue = queue.filter(
+    item => item.mediaType === 'episode' && contextIds.has(item.mediaId),
+  );
+  const positions = await listEpisodePlaybackPositions(
+    contextQueue.map(item => item.mediaId),
+  );
+  const resolvedQueue = await resolveDownloadedQueueSources(
+    contextQueue,
+    activeEpisodeId,
+  );
+
+  activatePlaybackQueue(resolvedQueue, activeEpisodeId, positions);
+  applyPreferredEpisodePlaybackSpeed();
+  startPlayback();
 }
 
 export function playPersistedQueueItem(mediaId: string) {

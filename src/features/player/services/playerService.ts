@@ -6,8 +6,12 @@ import {
   isPlaybackActive,
   pausePlayback,
   replaceQueueWithMediaItem,
+  replaceQueueWithMediaItems,
+  skipToNextPlaybackItem,
+  skipToPreviousPlaybackItem,
   startPlayback,
 } from '../infrastructure/trackPlayerAdapter';
+import type {RadioStation} from '../../radio/domain/radioStation';
 import {
   setRadioRetryEnabled,
   startRadioRetrySession,
@@ -18,7 +22,22 @@ export function initializePlayer() {
   initializeTrackPlayer();
 }
 
-export function playLiveAudio(item: LiveAudioItem) {
+function toRadioMediaItem(item: RadioStation) {
+  return {
+    mediaId: item.id,
+    url: item.streamUrl,
+    title: item.name,
+    artist: `${item.genre} · ${item.country}`,
+    isLive: true,
+    extras: {mediaType: 'radio' as const},
+    ...(item.mimeType === null ? {} : {mimeType: item.mimeType}),
+  };
+}
+
+export function playLiveAudio(
+  item: LiveAudioItem,
+  context: readonly RadioStation[] = [],
+) {
   resetLiveRadioPlaybackSpeed();
 
   if (getActiveMediaId() !== item.id) {
@@ -34,7 +53,14 @@ export function playLiveAudio(item: LiveAudioItem) {
       ...(item.mimeType === null ? {} : {mimeType: item.mimeType}),
     };
 
-    replaceQueueWithMediaItem(mediaItem);
+    if (context.length > 0) {
+      replaceQueueWithMediaItems(
+        context.map(toRadioMediaItem),
+        item.id,
+      );
+    } else {
+      replaceQueueWithMediaItem(mediaItem);
+    }
     startRadioRetrySession(item.id);
   } else {
     setRadioRetryEnabled(item.id, true);
@@ -59,4 +85,12 @@ export function togglePlayback() {
     setRadioRetryEnabled(activeMediaId, true);
   }
   startPlayback();
+}
+
+export function skipToNext() {
+  skipToNextPlaybackItem();
+}
+
+export function skipToPrevious() {
+  skipToPreviousPlaybackItem();
 }

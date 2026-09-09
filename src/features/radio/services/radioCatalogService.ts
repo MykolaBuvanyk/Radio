@@ -26,14 +26,17 @@ export function loadRadioCatalogPage(
   );
 }
 
-export function playCatalogStation(station: RadioStation) {
+export function playCatalogStation(
+  station: RadioStation,
+  context: readonly RadioStation[] = [],
+) {
   playLiveAudio({
     id: station.id,
     streamUrl: station.streamUrl,
     title: station.name,
     subtitle: `${station.genre} · ${station.country}`,
     mimeType: station.mimeType,
-  });
+  }, context);
 
   recordRadioStationClick(station.id).catch(() => undefined);
 }

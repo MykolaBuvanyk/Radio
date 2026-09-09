@@ -4,6 +4,7 @@ import {FlatList, Pressable, Text, View, type ListRenderItemInfo} from 'react-na
 import {DownloadCard} from '../components/DownloadCard';
 import type {EpisodeDownloadListItem} from '../domain/download';
 import {useDownloadLibrary} from '../hooks/useEpisodeDownloads';
+import {usePlayerSnapshot} from '../../player/infrastructure/usePlayerSnapshot';
 import {
   downloadsScreenNativeStyles,
   downloadsScreenStyles,
@@ -25,8 +26,10 @@ function DownloadSeparator() {
 
 export function DownloadsScreen() {
   const downloads = useDownloadLibrary();
+  const player = usePlayerSnapshot();
   const pauseDownload = downloads.pause;
   const removeDownload = downloads.remove;
+  const playDownload = downloads.play;
   const resumeDownload = downloads.resume;
   const updateLimit = downloads.updateLimit;
   const handlePause = useCallback(
@@ -41,6 +44,22 @@ export function DownloadsScreen() {
     },
     [removeDownload],
   );
+  const handlePlay = useCallback(
+    (episodeId: string) => {
+      const item = downloads.items.find(download => download.episodeId === episodeId);
+
+      if (item) {
+        playDownload(
+          episodeId,
+          item.podcastTitle,
+          downloads.items
+            .filter(download => download.status === 'completed')
+            .map(download => download.episodeId),
+        ).catch(() => undefined);
+      }
+    },
+    [downloads.items, playDownload],
+  );
   const handleResume = useCallback(
     (episodeId: string) => {
       resumeDownload(episodeId).catch(() => undefined);
@@ -50,14 +69,32 @@ export function DownloadsScreen() {
   const renderDownload = useCallback(
     ({item}: ListRenderItemInfo<EpisodeDownloadListItem>) => (
       <DownloadCard
+        isCurrent={
+          player.mediaType === 'episode' && player.mediaId === item.episodeId
+        }
+        isPlaying={
+          player.mediaType === 'episode' &&
+          player.mediaId === item.episodeId &&
+          player.isPlaying
+        }
         isPending={downloads.pendingEpisodeId === item.episodeId}
         item={item}
         onPause={handlePause}
+        onPlay={handlePlay}
         onRemove={handleRemove}
         onResume={handleResume}
       />
     ),
-    [downloads.pendingEpisodeId, handlePause, handleRemove, handleResume],
+    [
+      downloads.pendingEpisodeId,
+      handlePause,
+      handlePlay,
+      handleRemove,
+      handleResume,
+      player.mediaId,
+      player.mediaType,
+      player.isPlaying,
+    ],
   );
   const header = (
     <View className={downloadsScreenStyles.header}>

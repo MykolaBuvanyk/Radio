@@ -37,8 +37,8 @@ import {
 } from '../infrastructure/downloadRepository';
 
 const MAX_CONCURRENT_DOWNLOADS = 2;
-const PROGRESS_PERSIST_INTERVAL_MS = 750;
-const PROGRESS_PERSIST_BYTE_INTERVAL = 256 * 1024;
+const PROGRESS_PERSIST_INTERVAL_MS = 200;
+const PROGRESS_PERSIST_BYTE_INTERVAL = 64 * 1024;
 
 type CancellationReason = 'pause' | 'delete';
 
@@ -50,6 +50,15 @@ type ActiveDownload = {
 const activeDownloads = new Map<string, ActiveDownload>();
 const scheduledEpisodeIds = new Set<string>();
 const blockedEpisodeIds = new Set<string>();
+export type DownloadProgressUpdate = {
+  bytesDownloaded: number;
+  episodeId: string;
+  totalBytes: number | null;
+};
+
+const progressListeners = new Set<
+  (update: DownloadProgressUpdate) => void
+>();
 let isInitialized = false;
 let pumpPromise: Promise<void> | null = null;
 
@@ -69,7 +78,42 @@ function getErrorMessage(error: unknown) {
     return 'The download timed out. You can retry it.';
   }
 
+  if (normalized.includes('http ')) {
+    return `The download server rejected the request (${message}).`;
+  }
+
+  if (
+    normalized.includes('unknownhost') ||
+    normalized.includes('unable to resolve host') ||
+    normalized.includes('network request failed')
+  ) {
+    return 'The emulator could not resolve the download server. Check its network connection.';
+  }
+
+  if (
+    message &&
+    message !== '[object Object]' &&
+    message !== 'The download failed.'
+  ) {
+    return `Download failed: ${message}`;
+  }
+
   return 'The episode could not be downloaded. Check your connection and retry.';
+}
+
+function isResumableDownloadError(error: unknown) {
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+
+  return (
+    message.includes('interrupted') ||
+    message.includes('timeout') ||
+    message.includes('socket') ||
+    message.includes('connection') ||
+    message.includes('network') ||
+    message.includes('eof')
+  );
 }
 
 function getEpisodeExtension(episode: PodcastEpisode) {
@@ -171,6 +215,25 @@ async function persistProgress(
     temporaryUri,
     totalBytes,
   });
+
+  const update = {bytesDownloaded, episodeId, totalBytes};
+  progressListeners.forEach(listener => {
+    try {
+      listener(update);
+    } catch {
+      // UI subscribers must never interrupt the download pipeline.
+    }
+  });
+}
+
+export function subscribeDownloadProgress(
+  listener: (update: DownloadProgressUpdate) => void,
+) {
+  progressListeners.add(listener);
+
+  return () => {
+    progressListeners.delete(listener);
+  };
 }
 
 async function runDownload(episodeId: string) {
@@ -343,7 +406,30 @@ async function runDownload(episodeId: string) {
       ).catch(() => undefined);
       await pauseEpisodeDownload(episodeId);
     } else if (activeDownload.cancelReason !== 'delete') {
-      await deleteFileIfPresent(paths.segmentPath).catch(() => undefined);
+      if (isResumableDownloadError(error)) {
+        await progressWriteChain;
+        const segmentSize = (await getFileSize(paths.segmentPath)) ?? 0;
+
+        if (segmentSize > 0) {
+          if (partialSize > 0) {
+            await appendFile(paths.segmentPath, paths.partialPath);
+            await deleteFileIfPresent(paths.segmentPath);
+          } else {
+            await moveFile(paths.segmentPath, paths.partialPath);
+          }
+        }
+
+        const persistedSize = (await getFileSize(paths.partialPath)) ?? 0;
+        await persistProgress(
+          episodeId,
+          paths.partialPath,
+          persistedSize,
+          episode.fileSizeBytes,
+        ).catch(() => undefined);
+      } else {
+        await deleteFileIfPresent(paths.segmentPath).catch(() => undefined);
+      }
+
       await markEpisodeDownloadFailed(episodeId, getErrorMessage(error));
     } else {
       await deleteFileIfPresent(paths.segmentPath).catch(() => undefined);

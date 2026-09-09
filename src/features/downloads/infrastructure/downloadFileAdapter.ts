@@ -1,4 +1,4 @@
-import {Platform} from 'react-native';
+import { Platform } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
 const DOWNLOAD_DIRECTORY_NAME = 'radio-episodes';
@@ -123,6 +123,7 @@ export function startFileDownload(
 ): FileDownloadTask {
   const headers: Record<string, string> = {
     Accept: 'audio/*,application/octet-stream;q=0.9,*/*;q=0.8',
+    'Accept-Encoding': 'identity',
     'Cache-Control': 'no-cache',
     'User-Agent': 'Radio/1.0 (Android; React Native)',
   };
@@ -153,7 +154,7 @@ export function startFileDownload(
           timeout: 120_000,
         })
           .fetch('GET', url, headers)
-          .progress({interval: 500}, (received, total) => {
+          .progress({ interval: 200 }, (received, total) => {
             onProgress({
               receivedBytes: Math.max(0, received),
               totalBytes: total > 0 ? total : null,

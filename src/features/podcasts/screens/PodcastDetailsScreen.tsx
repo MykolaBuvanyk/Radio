@@ -42,7 +42,7 @@ export function PodcastDetailsScreen({route}: PodcastDetailsScreenProps) {
   };
   const handlePlay = (episode: PodcastEpisode) => {
     playbackQueue
-      .playEpisode(episode, podcast.podcastTitle)
+      .playEpisode(episode, podcast.podcastTitle, podcast.episodes)
       .catch(() => undefined);
   };
   const handleDownloadAction = (
